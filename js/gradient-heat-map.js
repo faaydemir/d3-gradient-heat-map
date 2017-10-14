@@ -30,9 +30,36 @@ function DrawGradientHeatMap(containerSvg, config, dataConfig, data) {
         .range([0, 1])
         .domain(dataXDomain);
 
-    var colorScale = d3.scale.quantile()
-        .domain(dataYDomain)
-        .range(config.colors);
+
+    function ColorScale(data, colors, key) {
+
+        var getValue = function (d) {
+            return (typeof key != 'undefined') ? d[key] : d
+        };
+        var dataRange = d3.extent(data, getValue);
+        var scaleCount = (colors.length - 1);
+        var colorScaleRange = (dataRange[1] - dataRange[0]) / scaleCount;
+        var scales = [];
+
+        for (var i = 0; i < scaleCount; i++) {
+            var a = d3.scale.linear().range([colors[i], colors[i + 1]]).domain([i * colorScaleRange, (i + 1) * colorScaleRange])
+            scales.push(a);
+        }
+
+        var scale = function (d) {
+            var scaleIndex = Math.floor(getValue(d) / colorScaleRange);
+            if (scaleIndex >= scales.length) {
+                scaleIndex = scales.length - 1;
+            }
+            var scalefunction = scales[scaleIndex]
+            return (scalefunction(getValue(d)));
+        }
+
+        return scale;
+    }
+
+    var colorScale = ColorScale(data,config.colors,dataConfig.y);
+
 
     defs.append("linearGradient")
         .attr("id", "gradient-rainbow-colors")
@@ -43,8 +70,8 @@ function DrawGradientHeatMap(containerSvg, config, dataConfig, data) {
         .selectAll("stop")
         .data(data)
         .enter().append("stop")
-        .attr("offset", function (d, i) { return scaleX(d[dataConfig.x])})
-        .attr("stop-color", function (d) { return colorScale(d[dataConfig.y]) });
+        .attr("offset", function (d, i) { return scaleX(d[dataConfig.x]) })
+        .attr("stop-color", function (d) { return colorScale(d) });
 
 
 
@@ -59,6 +86,8 @@ function DrawGradientHeatMap(containerSvg, config, dataConfig, data) {
 
     update = function (config, data, dataConfig, duration) {
 
+        colorScale = ColorScale(data,config.colors,dataConfig.y)
+
         dataYDomain = d3.extent(data, function (d) {
             return d[dataConfig.y];
         });
@@ -66,9 +95,6 @@ function DrawGradientHeatMap(containerSvg, config, dataConfig, data) {
             return d[dataConfig.x];
         });
         scaleX.domain(dataXDomain);
-        colorScale = d3.scale.quantile()
-            .domain(dataYDomain)
-            .range(config.colors);
 
         defs.select("#gradient-rainbow-colors").selectAll("stop").remove();
 
@@ -76,9 +102,9 @@ function DrawGradientHeatMap(containerSvg, config, dataConfig, data) {
             .data(data)
             .enter()
             .append("stop")
-            .attr("offset", function (d, i) { return scaleX(d[dataConfig.x])  })             
+            .attr("offset", function (d, i) { return scaleX(d[dataConfig.x]) })
             .attr("stop-color", function (d) {
-                return colorScale(d[dataConfig.y]);
+                return colorScale(d);
             });
 
         heatMap.style("fill", "url(#gradient-rainbow-colors)");
